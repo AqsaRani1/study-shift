@@ -808,7 +808,7 @@ Utility: ${c.utility}. Group: ${S.user.group}.
 Search: "${c.utility} load shedding schedule today 2026 ${c.name} group ${S.user.group}"
 Return 24 hourly values (0=outage,1=power) as JSON.`;
   try {
-    const raw = await callClaude([{ role: "user", content: MSG }], SYS, true);
+    const raw = await callGemini([{ role: "user", content: MSG }], SYS, true);
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match)
       throw new Error("Could not parse schedule JSON from AI response");
@@ -914,7 +914,7 @@ Tasks: ${
 
 Be concise, helpful, specific to Pakistan. Use web search for current schedules. Format clearly. Under 220 words unless asked for more.`;
   try {
-    const reply = await callClaude(S.chatHistory.slice(-10), SYS, true);
+    const reply = await callGemini(S.chatHistory.slice(-10), SYS, true);
     thinking.remove();
     S.chatHistory.push({ role: "assistant", content: reply });
     addMsg("assistant", formatMsg(reply));
@@ -991,4 +991,36 @@ function highlight(id) {
   e.style.borderColor = "var(--red)";
   e.focus();
   setTimeout(() => (e.style.borderColor = ""), 2000);
+}
+async function callGemini(prompt) {
+  const key = window.STUDYSHIFT_CONFIG.GEMINI_API_KEY;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+      }),
+    },
+  );
+
+  if (!res.ok) {
+    throw new Error(`API Error ${res.status}`);
+  }
+
+  const data = await res.json();
+
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
