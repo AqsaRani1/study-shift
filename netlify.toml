@@ -1,14 +1,9 @@
-# ============================================================
-# netlify.toml — StudyShift Netlify config
-# ============================================================
-
 [build]
   publish = "."
   functions = "netlify/functions"
 
-# API proxy — must come BEFORE the /* catch-all
 [[redirects]]
-  from   = "/api/claude"
-  to     = "/.netlify/functions/claude-proxy"
+  from   = "/api/gemini"
+  to     = "/.netlify/functions/gemini-proxy"
   status = 200
   force  = true
