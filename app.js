@@ -277,3 +277,20 @@ function uid() {
 function esc(s) {
   return s.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+function refreshUI() {
+  const u = S.user;
+  const c = CITIES?.[u.city] || { name: "Unknown", utility: "" };
+
+  const el1 = document.getElementById("sb-uname");
+  if (el1) el1.textContent = u.name;
+
+  const el2 = document.getElementById("sb-ucity");
+  if (el2) el2.textContent = `${c.name} · Group ${u.group}`;
+
+  const h = new Date().getHours();
+  const g =
+    h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+
+  const greet = document.getElementById("greeting");
+  if (greet) greet.textContent = `${g}, ${u.name}`;
+}
