@@ -294,3 +294,84 @@ function refreshUI() {
   const greet = document.getElementById("greeting");
   if (greet) greet.textContent = `${g}, ${u.name}`;
 }
+const CITIES = {
+  lahore: {
+    name: "Lahore",
+    utility: "LESCO",
+    province: "Punjab",
+    peak: "6–10 PM",
+  },
+  karachi: {
+    name: "Karachi",
+    utility: "K-Electric",
+    province: "Sindh",
+    peak: "5–9 PM",
+  },
+  islamabad: {
+    name: "Islamabad",
+    utility: "IESCO",
+    province: "ICT",
+    peak: "6–10 PM",
+  },
+};
+function getGroupPattern(city, group) {
+  // simple deterministic fallback pattern
+  const base = Array(24).fill(1);
+
+  for (let i = 0; i < 24; i++) {
+    if ((i + group) % 6 === 0) base[i] = 0;
+  }
+
+  return base;
+}
+function renderDash() {
+  const pat = getPattern();
+
+  const power = pat.filter((v) => v === 1).length;
+  const outage = 24 - power;
+
+  setText("sc-power", power + "h");
+  setText("sc-outage", outage + "h");
+  setText("sc-tasks", S.tasks.filter((t) => !t.done).length);
+
+  const p = document.getElementById("scf-power");
+  const o = document.getElementById("scf-outage");
+
+  if (p) p.style.width = (power / 24) * 100 + "%";
+  if (o) o.style.width = (outage / 24) * 100 + "%";
+}
+function setText(id, v) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = v;
+}
+function renderSched() {}
+
+function renderTasks() {
+  const el = document.getElementById("tasks-list");
+  if (!el) return;
+
+  el.innerHTML = S.tasks
+    .map(
+      (t) =>
+        `<div class="task">
+      <b>${esc(t.name)}</b> - ${t.duration}min
+    </div>`,
+    )
+    .join("");
+}
+
+function renderCities() {}
+function addMsg(role, html) {
+  console.log(role, html);
+}
+
+function addThinking() {
+  return { remove: () => {} };
+}
+
+function formatMsg(t) {
+  return t;
+}
+function tick() {
+  // prevents crash (you can upgrade later)
+}
