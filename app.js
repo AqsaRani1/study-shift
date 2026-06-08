@@ -787,10 +787,10 @@ async function callClaude(messages, system, webSearch = false) {
 // ── AI SCHEDULE FETCH ──
 async function fetchAISchedule() {
   if (S.busy) return;
-  if (!aiAvailable()) {
-    setAIBarSub("Add your Claude API key to config.js, then refresh.");
-    return;
-  }
+  // if (!aiAvailable()) {
+  //   setAIBarSub("Add your Claude API key to config.js, then refresh.");
+  //   return;
+  // }
   S.busy = true;
   const btn = document.getElementById("ai-bar-btn");
   const ico = document.getElementById("ai-bar-icon");
