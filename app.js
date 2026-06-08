@@ -687,13 +687,24 @@ async function callGemini(prompt, systemContext = "") {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const e = await res.json().catch(() => ({}));
-    const msg = e?.error?.message || e?.error || `API error ${res.status}`;
-    if (res.status === 400)
-      throw new Error("Bad request — check your API key is valid");
+    let errMsg = `Gemini API error ${res.status}`;
+    try {
+      const e = await res.json();
+      errMsg = e?.error?.message || e?.error || errMsg;
+    } catch (e) {}
+    // Surface the real error clearly
+    if (res.status === 400 && errMsg.includes("API key"))
+      throw new Error(
+        `Invalid API key. Get a fresh key from aistudio.google.com/apikey`,
+      );
+    if (res.status === 400) throw new Error(`Bad request: ${errMsg}`);
+    if (res.status === 403)
+      throw new Error(
+        `API key not authorized. Enable Gemini API at console.cloud.google.com`,
+      );
     if (res.status === 429)
       throw new Error("Rate limit hit. Wait a moment and try again.");
-    throw new Error(msg);
+    throw new Error(errMsg);
   }
   const data = await res.json();
   // Extract text from Gemini response format
