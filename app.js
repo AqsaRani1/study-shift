@@ -733,7 +733,7 @@ async function callClaude(messages, system, webSearch = false) {
 
 async function callClaude(messages, system, webSearch = false) {
   const cfg = window.STUDYSHIFT_CONFIG || {};
-  const endpoint = getApiEndpoint();
+  const endpoint = "/api/claude";
   const isProxy = endpoint === "/api/claude";
 
   const body = {
