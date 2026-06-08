@@ -1,0 +1,20 @@
+# ============================================================
+# netlify.toml — Netlify configuration for StudyShift
+# ============================================================
+
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+# Redirect /api/claude to the Netlify function
+# This means app.js calls /api/claude on both local and Netlify
+[[redirects]]
+  from = "/api/claude"
+  to   = "/.netlify/functions/claude-proxy"
+  status = 200
+
+# Serve index.html for all routes (SPA fallback)
+[[redirects]]
+  from = "/*"
+  to   = "/index.html"
+  status = 200
