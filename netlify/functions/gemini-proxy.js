@@ -15,18 +15,22 @@ exports.handler = async function (event) {
   if (event.httpMethod === "GET") {
     const key = process.env.GEMINI_API_KEY || "";
     const keySet = key.length > 0;
+    const keyOk = key.startsWith("AIza"); // all Gemini keys start with AIza
     return {
       statusCode: 200,
       headers: { ...CORS, "Content-Type": "application/json" },
       body: JSON.stringify({
         status: keySet ? "ok" : "error",
         key_set: keySet,
+        key_valid: keyOk,
         key_hint: keySet
           ? `${key.slice(0, 6)}...${key.slice(-4)} (${key.length} chars)`
           : "NOT SET",
         message: !keySet
           ? "❌ GEMINI_API_KEY not set. Netlify → Site configuration → Environment variables → Add GEMINI_API_KEY"
-          : "✅ Key is set. Function is ready.",
+          : !keyOk
+            ? "⚠️ Key is set but does NOT start with AIza — it may be wrong. Gemini keys always start with AIza"
+            : "✅ Key looks correct. Function is ready.",
       }),
     };
   }
@@ -36,14 +40,26 @@ exports.handler = async function (event) {
 
   const apiKey = (process.env.GEMINI_API_KEY || "").trim();
 
-  if (!apiKey) {
+  // if (!apiKey) {
+  //   return {
+  //     statusCode: 500,
+  //     headers: { ...CORS, "Content-Type": "application/json" },
+  //     body: JSON.stringify({
+  //       error: {
+  //         message:
+  //           "GEMINI_API_KEY not set. Go to Netlify → Site configuration → Environment variables → Add GEMINI_API_KEY",
+  //       },
+  //     }),
+  //   };
+  // }
+
+  if (!apiKey.startsWith("AIza")) {
     return {
       statusCode: 500,
       headers: { ...CORS, "Content-Type": "application/json" },
       body: JSON.stringify({
         error: {
-          message:
-            "GEMINI_API_KEY not set. Go to Netlify → Site configuration → Environment variables → Add GEMINI_API_KEY",
+          message: `API key looks wrong — Gemini keys always start with "AIza". Your key starts with "${apiKey.slice(0, 6)}". Get a fresh key from aistudio.google.com/apikey`,
         },
       }),
     };
