@@ -72,7 +72,7 @@ exports.handler = async function (event) {
   const temperature = parsedBody?.generationConfig?.temperature ?? 0.7;
 
   const groqBody = {
-    model: "llama3-8b-8192",
+    model: "qwen/qwen3-32b",
     messages: [{ role: "user", content: geminiText }],
     max_tokens: maxTokens,
     temperature: temperature,
