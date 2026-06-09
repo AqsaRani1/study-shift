@@ -40,30 +40,30 @@ exports.handler = async function (event) {
 
   const apiKey = (process.env.GEMINI_API_KEY || "").trim();
 
-  // if (!apiKey) {
-  //   return {
-  //     statusCode: 500,
-  //     headers: { ...CORS, "Content-Type": "application/json" },
-  //     body: JSON.stringify({
-  //       error: {
-  //         message:
-  //           "GEMINI_API_KEY not set. Go to Netlify → Site configuration → Environment variables → Add GEMINI_API_KEY",
-  //       },
-  //     }),
-  //   };
-  // }
-
-  if (!apiKey.startsWith("AIza")) {
+  if (!apiKey) {
     return {
       statusCode: 500,
       headers: { ...CORS, "Content-Type": "application/json" },
       body: JSON.stringify({
         error: {
-          message: `API key looks wrong — Gemini keys always start with "AIza". Your key starts with "${apiKey.slice(0, 6)}". Get a fresh key from aistudio.google.com/apikey`,
+          message:
+            "GEMINI_API_KEY not set. Go to Netlify → Site configuration → Environment variables → Add GEMINI_API_KEY",
         },
       }),
     };
   }
+
+  // if (!apiKey.startsWith("AIza")) {
+  //   return {
+  //     statusCode: 500,
+  //     headers: { ...CORS, "Content-Type": "application/json" },
+  //     body: JSON.stringify({
+  //       error: {
+  //         message: `API key looks wrong — Gemini keys always start with "AIza". Your key starts with "${apiKey.slice(0, 6)}". Get a fresh key from aistudio.google.com/apikey`,
+  //       },
+  //     }),
+  //   };
+  // }
 
   let parsedBody;
   try {
