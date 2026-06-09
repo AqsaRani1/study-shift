@@ -290,13 +290,23 @@ function taskHTML(t, conflict = false) {
       : `<span class="ttag ttag-pwr"><i class="bi bi-plug-fill"></i>Needs power</span>`
     : `<span class="ttag ttag-off"><i class="bi bi-book"></i>Offline ok</span>`;
   const timeStr = t.scheduledTime ? fmtHour(+t.scheduledTime) : "—";
+  // Build hour options for manual time picker
+  const hourOpts = Array.from(
+    { length: 24 },
+    (_, h) =>
+      `<option value="${h}"${+t.scheduledTime === h ? " selected" : ""}>${fmtHour(h)}</option>`,
+  ).join("");
   return `<div class="task-item ${t.needsPower ? "needs-power" : "no-power"}${t.done ? " done" : ""}${conflict ? " conflict" : ""}" data-id="${t.id}">
     <div class="t-check ${t.done ? "checked" : ""}" onclick="toggleDone('${t.id}')">${t.done ? '<i class="bi bi-check-lg"></i>' : ""}</div>
     <div class="t-body">
       <div class="t-name"><i class="bi ${ico}" style="margin-right:5px;opacity:0.55"></i>${esc(t.name)}</div>
       <div class="t-meta">${pwr}<span><i class="bi bi-clock"></i> ${t.duration}min</span></div>
     </div>
-    <div class="t-time">${timeStr}</div>
+    <div class="t-time" style="display:flex;align-items:center;gap:6px;">
+      <select style="font-size:11px;padding:2px 4px;border-radius:6px;border:1px solid #444;background:transparent;color:inherit;cursor:pointer;" onchange="setTaskTime('${t.id}',this.value)" title="Move task to this time slot">
+        ${hourOpts}
+      </select>
+    </div>
     <button class="t-del" onclick="deleteTask('${t.id}')" title="Delete"><i class="bi bi-trash3"></i></button>
   </div>`;
 }
@@ -523,6 +533,15 @@ function autoReschedule() {
   renderDash();
   renderTasks();
 }
+function setTaskTime(id, hour) {
+  const t = S.tasks.find((t) => t.id === id);
+  if (!t) return;
+  t.scheduledTime = String(hour);
+  t.preferredTime = hour + ":00";
+  save();
+  renderDash();
+  renderTasks();
+}
 
 // ── TASK MODAL ──
 function openTaskModal(id = null) {
@@ -732,15 +751,44 @@ Use typical rotation patterns for ${c.utility} group ${S.user.group}. Respond wi
 
   try {
     const raw = await callGemini(prompt, systemCtx);
-    // Extract JSON from response
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match)
+    // Bulletproof JSON extraction — handles markdown fences, extra text, etc.
+    let parsed = null;
+    // Try 1: direct parse
+    try {
+      parsed = JSON.parse(raw.trim());
+    } catch (e) {}
+    // Try 2: extract first {...} block
+    if (!parsed) {
+      const match = raw.match(/\{[\s\S]*?\}/);
+      if (match)
+        try {
+          parsed = JSON.parse(match[0]);
+        } catch (e) {}
+    }
+    // Try 3: extract largest {...} block
+    if (!parsed) {
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match)
+        try {
+          parsed = JSON.parse(match[0]);
+        } catch (e) {}
+    }
+    // Try 4: extract hours array directly and build object
+    if (!parsed) {
+      const arrMatch = raw.match(/\[([0-9,\s]+)\]/);
+      if (arrMatch) {
+        const hrs = JSON.parse(arrMatch[0]);
+        if (hrs.length === 24) parsed = { hours: hrs };
+      }
+    }
+    if (!parsed)
       throw new Error("Could not parse schedule JSON from AI response");
-    const parsed = JSON.parse(match[0]);
+    // Normalize: coerce "0"/"1" strings to numbers, clamp any other value to 0/1
+    if (Array.isArray(parsed.hours)) {
+      parsed.hours = parsed.hours.map((v) => (Number(v) >= 1 ? 1 : 0));
+    }
     if (!Array.isArray(parsed.hours) || parsed.hours.length !== 24)
       throw new Error("Invalid schedule (need exactly 24 values)");
-    if (!parsed.hours.every((v) => v === 0 || v === 1))
-      throw new Error("Invalid values — must all be 0 or 1");
 
     S.aiPattern = parsed.hours;
     S.aiSource = `Historical pattern · ${c.utility} Group ${S.user.group} · Live API integration available for production`;
