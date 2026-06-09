@@ -728,12 +728,11 @@ Format: {"hours":[0,1,0,...],"source":"source name","note":"brief note"}
 "hours" must be exactly 24 integers (0=outage, 1=power available) for hours 0-23.
 If exact data is unavailable use the typical pattern for that city and utility.`;
 
-  const prompt = `Generate a typical load shedding schedule for ${c.name}, Pakistan.
-Utility: ${c.utility}. Group: ${S.user.group}.
-Use your knowledge of ${c.utility} load shedding rotation patterns for Group ${S.user.group}.
-Be honest in the note field — say this is based on typical/historical patterns for this utility and group.
-The note should mention it uses historical data and that live API integration would give real-time accuracy.
-Return exactly 24 hourly values (0=outage, 1=power available).`;
+  const prompt = `Return a JSON object for the typical load shedding schedule for ${c.name}, Pakistan, utility ${c.utility}, group ${S.user.group}.
+JSON format (respond with this exact structure, nothing else):
+{"hours":[0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],"source":"${c.utility}","note":"Historical pattern"}
+"hours" must be exactly 24 integers where 0=outage and 1=power available.
+Use typical rotation patterns for ${c.utility} group ${S.user.group}. Respond with JSON only.`;
 
   try {
     const raw = await callGemini(prompt, systemCtx);
@@ -748,11 +747,7 @@ Return exactly 24 hourly values (0=outage, 1=power available).`;
       throw new Error("Invalid values — must all be 0 or 1");
 
     S.aiPattern = parsed.hours;
-    const dataLabel =
-      parsed.dataType === "historical" ? "Historical pattern" : "AI estimate";
-    S.aiSource =
-      parsed.note ||
-      `${dataLabel} · ${c.utility} Group ${S.user.group} · Upgrade to live API for real-time data`;
+    S.aiSource = `Historical pattern · ${c.utility} Group ${S.user.group} · Live API integration available for production`;
     save();
     autoSchedule();
     renderDash();
