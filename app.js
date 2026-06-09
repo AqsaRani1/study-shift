@@ -737,6 +737,7 @@ Use typical rotation patterns for ${c.utility} group ${S.user.group}. Respond wi
   try {
     const raw = await callGemini(prompt, systemCtx);
     // Extract JSON from response
+    console.log(raw);
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match)
       throw new Error("Could not parse schedule JSON from AI response");
@@ -748,7 +749,7 @@ Use typical rotation patterns for ${c.utility} group ${S.user.group}. Respond wi
 
     S.aiPattern = parsed.hours;
     S.aiSource = `Historical pattern · ${c.utility} Group ${S.user.group} · Live API integration available for production`;
-    console.log(parsed);
+
     save();
     autoSchedule();
     renderDash();
