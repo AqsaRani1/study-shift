@@ -200,7 +200,7 @@ function renderDash() {
   if (note) {
     if (S.aiPattern && S.aiSource) {
       note.classList.remove("hidden");
-      setText("ai-src-txt", `Live Gemini data · ${S.aiSource}`);
+      setText("ai-src-txt", `📊 ${S.aiSource}`);
     } else {
       note.classList.add("hidden");
     }
@@ -719,14 +719,10 @@ async function fetchAISchedule() {
   const icon = document.getElementById("ai-bar-icon");
   btn.disabled = true;
   icon.className = "bi bi-arrow-clockwise spinning";
-  setAIBarSub("Fetching today's live load shedding schedule via Gemini AI...");
+  setAIBarSub("Loading typical schedule for your city and group...");
 
   const c = CITIES[S.user.city];
-  const systemCtx = `You are a load shedding data assistant for Pakistan.
-Return ONLY a valid JSON object, no markdown, no explanation, no code fences.
-Format: {"hours":[0,1,0,...],"source":"source name","note":"brief note"}
-"hours" must be exactly 24 integers (0=outage, 1=power available) for hours 0-23.
-If exact data is unavailable use the typical pattern for that city and utility.`;
+  const systemCtx = `You are a JSON API. Respond with ONLY a JSON object. No text before or after. No markdown. No explanation.`;
 
   const prompt = `Return a JSON object for the typical load shedding schedule for ${c.name}, Pakistan, utility ${c.utility}, group ${S.user.group}.
 JSON format (respond with this exact structure, nothing else):
@@ -737,7 +733,6 @@ Use typical rotation patterns for ${c.utility} group ${S.user.group}. Respond wi
   try {
     const raw = await callGemini(prompt, systemCtx);
     // Extract JSON from response
-    console.log(raw);
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match)
       throw new Error("Could not parse schedule JSON from AI response");
@@ -749,11 +744,12 @@ Use typical rotation patterns for ${c.utility} group ${S.user.group}. Respond wi
 
     S.aiPattern = parsed.hours;
     S.aiSource = `Historical pattern · ${c.utility} Group ${S.user.group} · Live API integration available for production`;
-
     save();
     autoSchedule();
     renderDash();
-    setAIBarSub(`✓ Live schedule loaded — ${S.aiSource}`);
+    setAIBarSub(
+      `✓ Schedule loaded — Historical pattern · ${c.utility} Group ${S.user.group}`,
+    );
     icon.className = "bi bi-check-circle-fill";
     btn.style.background = "var(--green)";
     btn.style.color = "#0d0c0a";
