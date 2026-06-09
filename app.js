@@ -200,7 +200,7 @@ function renderDash() {
   if (note) {
     if (S.aiPattern && S.aiSource) {
       note.classList.remove("hidden");
-      setText("ai-src-txt", `📊 ${S.aiSource}`);
+      setText("ai-src-txt", `Live Gemini data · ${S.aiSource}`);
     } else {
       note.classList.add("hidden");
     }
@@ -290,23 +290,13 @@ function taskHTML(t, conflict = false) {
       : `<span class="ttag ttag-pwr"><i class="bi bi-plug-fill"></i>Needs power</span>`
     : `<span class="ttag ttag-off"><i class="bi bi-book"></i>Offline ok</span>`;
   const timeStr = t.scheduledTime ? fmtHour(+t.scheduledTime) : "—";
-  // Build hour options for manual time picker
-  const hourOpts = Array.from(
-    { length: 24 },
-    (_, h) =>
-      `<option value="${h}"${+t.scheduledTime === h ? " selected" : ""}>${fmtHour(h)}</option>`,
-  ).join("");
   return `<div class="task-item ${t.needsPower ? "needs-power" : "no-power"}${t.done ? " done" : ""}${conflict ? " conflict" : ""}" data-id="${t.id}">
     <div class="t-check ${t.done ? "checked" : ""}" onclick="toggleDone('${t.id}')">${t.done ? '<i class="bi bi-check-lg"></i>' : ""}</div>
     <div class="t-body">
       <div class="t-name"><i class="bi ${ico}" style="margin-right:5px;opacity:0.55"></i>${esc(t.name)}</div>
       <div class="t-meta">${pwr}<span><i class="bi bi-clock"></i> ${t.duration}min</span></div>
     </div>
-    <div class="t-time" style="display:flex;align-items:center;gap:6px;">
-      <select style="font-size:11px;padding:2px 4px;border-radius:6px;border:1px solid #444;background:transparent;color:inherit;cursor:pointer;" onchange="setTaskTime('${t.id}',this.value)" title="Move task to this time slot">
-        ${hourOpts}
-      </select>
-    </div>
+    <div class="t-time">${timeStr}</div>
     <button class="t-del" onclick="deleteTask('${t.id}')" title="Delete"><i class="bi bi-trash3"></i></button>
   </div>`;
 }
@@ -340,12 +330,10 @@ function renderSched() {
     const dt = new Date(start);
     dt.setDate(start.getDate() + d);
     const isT = dt.toDateString() === today.toDateString();
-    // Use AI-fetched pattern for today; rotate statically for other days
-    const dayGroup = ((S.user.group + (d % 3) - 1) % 8) + 1;
-    const pat =
-      d === 0 && S.weekOffset === 0 && S.aiPattern
-        ? S.aiPattern
-        : getGroupPattern(S.user.city, dayGroup);
+    const pat = getGroupPattern(
+      S.user.city,
+      ((S.user.group + (d % 3) - 1) % 8) + 1,
+    );
     const st = getPowerStats(pat);
     const blks = getScheduleBlocks(pat);
     const card = document.createElement("div");
@@ -444,23 +432,16 @@ function renderCities() {
   if (!g) return;
   g.innerHTML = Object.entries(CITIES)
     .map(([k, c]) => {
-      // Use AI-fetched pattern for the user's own city
-      const pat =
-        k === S.user.city && S.aiPattern ? S.aiPattern : getGroupPattern(k, 1);
+      const pat = getGroupPattern(k, 1);
       const st = getPowerStats(pat);
-      const isUserCity = k === S.user.city;
-      const aiLabel =
-        isUserCity && S.aiPattern
-          ? ' <span style="font-size:9px;background:#1d9e75;color:#fff;padding:1px 5px;border-radius:4px;margin-left:4px">AI</span>'
-          : "";
       const slots = pat
         .map(
           (v) =>
             `<div class="mini-s ${v ? "power" : "off"}" style="flex:1;height:16px"></div>`,
         )
         .join("");
-      return `<div class="city-card${isUserCity ? " today" : ""}" onclick="cityInfo('${k}')">
-      <div class="city-card-hd"><span class="city-nm-lbl">${c.name}${aiLabel}</span><span class="city-util-badge">${c.utility}</span></div>
+      return `<div class="city-card" onclick="cityInfo('${k}')">
+      <div class="city-card-hd"><span class="city-nm-lbl">${c.name}</span><span class="city-util-badge">${c.utility}</span></div>
       <div class="city-mini-tl">${slots}</div>
       <div class="city-info-row">
         <div class="ci-itm"><div class="ci-dot g"></div>${st.power}h power</div>
@@ -483,13 +464,9 @@ function filterCities(q) {
 }
 function cityInfo(k) {
   const c = CITIES[k];
-  const pat =
-    k === S.user.city && S.aiPattern ? S.aiPattern : getGroupPattern(k, 1);
-  const st = getPowerStats(pat);
-  const src =
-    k === S.user.city && S.aiPattern ? "AI-fetched data" : "historical pattern";
+  const st = getPowerStats(getGroupPattern(k, 1));
   alert(
-    `${c.name} (${c.utility})\nProvince: ${c.province}\nAvg power: ${st.power}h/day  |  Outage: ${st.outage}h/day\nPeak times: ${c.peak}\nData source: ${src}\n\nTo use this city, go to Settings (gear icon).`,
+    `${c.name} (${c.utility})\nProvince: ${c.province}\nAvg power: ${st.power}h/day  |  Outage: ${st.outage}h/day\nPeak times: ${c.peak}\n\nTo use this city, go to Settings (gear icon).`,
   );
 }
 
@@ -543,15 +520,6 @@ function autoReschedule() {
     t.preferredTime = "";
   });
   autoSchedule();
-  renderDash();
-  renderTasks();
-}
-function setTaskTime(id, hour) {
-  const t = S.tasks.find((t) => t.id === id);
-  if (!t) return;
-  t.scheduledTime = String(hour);
-  t.preferredTime = hour + ":00";
-  save();
   renderDash();
   renderTasks();
 }
@@ -751,66 +719,38 @@ async function fetchAISchedule() {
   const icon = document.getElementById("ai-bar-icon");
   btn.disabled = true;
   icon.className = "bi bi-arrow-clockwise spinning";
-  setAIBarSub("Loading typical schedule for your city and group...");
+  setAIBarSub("Fetching today's live load shedding schedule via Gemini AI...");
 
   const c = CITIES[S.user.city];
-  const systemCtx = `You are a JSON API. Respond with ONLY a JSON object. No text before or after. No markdown. No explanation.`;
+  const systemCtx = `You are a load shedding data assistant for Pakistan.
+Return ONLY a valid JSON object, no markdown, no explanation, no code fences.
+Format: {"hours":[0,1,0,...],"source":"source name","note":"brief note"}
+"hours" must be exactly 24 integers (0=outage, 1=power available) for hours 0-23.
+If exact data is unavailable use the typical pattern for that city and utility.`;
 
-  const prompt = `Return a JSON object for the typical load shedding schedule for ${c.name}, Pakistan, utility ${c.utility}, group ${S.user.group}.
-JSON format (respond with this exact structure, nothing else):
-{"hours":[0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1],"source":"${c.utility}","note":"Historical pattern"}
-"hours" must be exactly 24 integers where 0=outage and 1=power available.
-Use typical rotation patterns for ${c.utility} group ${S.user.group}. Respond with JSON only.`;
+  const prompt = `Find the current load shedding schedule for ${c.name}, Pakistan.
+Utility company: ${c.utility}. Load shedding Group: ${S.user.group}.
+Search your knowledge for: "${c.utility} load shedding schedule ${c.name} group ${S.user.group} 2025 2026"
+Return a JSON object with exactly 24 hourly values (0=outage, 1=power).`;
 
   try {
     const raw = await callGemini(prompt, systemCtx);
-    // Bulletproof JSON extraction — handles markdown fences, extra text, etc.
-    let parsed = null;
-    // Try 1: direct parse
-    try {
-      parsed = JSON.parse(raw.trim());
-    } catch (e) {}
-    // Try 2: extract first {...} block
-    if (!parsed) {
-      const match = raw.match(/\{[\s\S]*?\}/);
-      if (match)
-        try {
-          parsed = JSON.parse(match[0]);
-        } catch (e) {}
-    }
-    // Try 3: extract largest {...} block
-    if (!parsed) {
-      const match = raw.match(/\{[\s\S]*\}/);
-      if (match)
-        try {
-          parsed = JSON.parse(match[0]);
-        } catch (e) {}
-    }
-    // Try 4: extract hours array directly and build object
-    if (!parsed) {
-      const arrMatch = raw.match(/\[([0-9,\s]+)\]/);
-      if (arrMatch) {
-        const hrs = JSON.parse(arrMatch[0]);
-        if (hrs.length === 24) parsed = { hours: hrs };
-      }
-    }
-    if (!parsed)
+    // Extract JSON from response
+    const match = raw.match(/\{[\s\S]*\}/);
+    if (!match)
       throw new Error("Could not parse schedule JSON from AI response");
-    // Normalize: coerce "0"/"1" strings to numbers, clamp any other value to 0/1
-    if (Array.isArray(parsed.hours)) {
-      parsed.hours = parsed.hours.map((v) => (Number(v) >= 1 ? 1 : 0));
-    }
+    const parsed = JSON.parse(match[0]);
     if (!Array.isArray(parsed.hours) || parsed.hours.length !== 24)
       throw new Error("Invalid schedule (need exactly 24 values)");
+    if (!parsed.hours.every((v) => v === 0 || v === 1))
+      throw new Error("Invalid values — must all be 0 or 1");
 
     S.aiPattern = parsed.hours;
-    S.aiSource = `Historical pattern · ${c.utility} Group ${S.user.group} · Live API integration available for production`;
+    S.aiSource = parsed.note || parsed.source || `${c.utility} via Gemini AI`;
     save();
     autoSchedule();
     renderDash();
-    setAIBarSub(
-      `✓ Schedule loaded — Historical pattern · ${c.utility} Group ${S.user.group}`,
-    );
+    setAIBarSub(`✓ Live schedule loaded — ${S.aiSource}`);
     icon.className = "bi bi-check-circle-fill";
     btn.style.background = "var(--green)";
     btn.style.color = "#0d0c0a";
