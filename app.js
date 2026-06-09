@@ -200,7 +200,7 @@ function renderDash() {
   if (note) {
     if (S.aiPattern && S.aiSource) {
       note.classList.remove("hidden");
-      setText("ai-src-txt", `📊 ${S.aiSource}`);
+      setText("ai-src-txt", `Live Gemini data · ${S.aiSource}`);
     } else {
       note.classList.add("hidden");
     }
@@ -719,16 +719,14 @@ async function fetchAISchedule() {
   const icon = document.getElementById("ai-bar-icon");
   btn.disabled = true;
   icon.className = "bi bi-arrow-clockwise spinning";
-  setAIBarSub("Loading typical schedule for your city and group...");
+  setAIBarSub("Fetching today's live load shedding schedule via Gemini AI...");
 
   const c = CITIES[S.user.city];
-  const systemCtx = `You are a load shedding schedule assistant for Pakistan.
-Return ONLY a valid JSON object — no markdown, no explanation, no code fences.
-Format: {"hours":[0,1,0,...],"source":"source name","note":"brief note","dataType":"historical|estimated"}
+  const systemCtx = `You are a load shedding data assistant for Pakistan.
+Return ONLY a valid JSON object, no markdown, no explanation, no code fences.
+Format: {"hours":[0,1,0,...],"source":"source name","note":"brief note"}
 "hours" must be exactly 24 integers (0=outage, 1=power available) for hours 0-23.
-Be transparent: set dataType to "historical" if using known patterns, "estimated" if inferring.
-Note: this is a hackathon demo using a free offline AI model (Groq Llama 3.1).
-In production this would integrate directly with WAPDA/LESCO/K-Electric live APIs for real-time accuracy.`;
+If exact data is unavailable use the typical pattern for that city and utility.`;
 
   const prompt = `Generate a typical load shedding schedule for ${c.name}, Pakistan.
 Utility: ${c.utility}. Group: ${S.user.group}.
@@ -758,9 +756,7 @@ Return exactly 24 hourly values (0=outage, 1=power available).`;
     save();
     autoSchedule();
     renderDash();
-    setAIBarSub(
-      `✓ Schedule loaded — ${parsed.note || dataLabel + " · " + c.utility + " Group " + S.user.group}`,
-    );
+    setAIBarSub(`✓ Live schedule loaded — ${S.aiSource}`);
     icon.className = "bi bi-check-circle-fill";
     btn.style.background = "var(--green)";
     btn.style.color = "#0d0c0a";
