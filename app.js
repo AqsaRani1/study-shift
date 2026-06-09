@@ -291,10 +291,11 @@ function taskHTML(t, conflict = false) {
     : `<span class="ttag ttag-off"><i class="bi bi-book"></i>Offline ok</span>`;
   const timeStr = t.scheduledTime ? fmtHour(+t.scheduledTime) : "—";
   // Build hour options for manual time picker
+  const pat = getPattern();
   const hourOpts = Array.from(
     { length: 24 },
     (_, h) =>
-      `<option value="${h}"${+t.scheduledTime === h ? " selected" : ""}>${fmtHour(h)}</option>`,
+      `<option value="${h}"${+t.scheduledTime === h ? " selected" : ""} ${t.needsPower && pat[h] === 0 ? "style='background:#5a1a1a;color:#ff6b6b'" : ""} >${fmtHour(h)}${t.needsPower && pat[h] === 0 ? " ⚡OUTAGE" : ""}</option>`,
   ).join("");
   return `<div class="task-item ${t.needsPower ? "needs-power" : "no-power"}${t.done ? " done" : ""}${conflict ? " conflict" : ""}" data-id="${t.id}">
     <div class="t-check ${t.done ? "checked" : ""}" onclick="toggleDone('${t.id}')">${t.done ? '<i class="bi bi-check-lg"></i>' : ""}</div>
