@@ -340,10 +340,12 @@ function renderSched() {
     const dt = new Date(start);
     dt.setDate(start.getDate() + d);
     const isT = dt.toDateString() === today.toDateString();
-    const pat = getGroupPattern(
-      S.user.city,
-      ((S.user.group + (d % 3) - 1) % 8) + 1,
-    );
+    // Use AI-fetched pattern for today; rotate statically for other days
+    const dayGroup = ((S.user.group + (d % 3) - 1) % 8) + 1;
+    const pat =
+      d === 0 && S.weekOffset === 0 && S.aiPattern
+        ? S.aiPattern
+        : getGroupPattern(S.user.city, dayGroup);
     const st = getPowerStats(pat);
     const blks = getScheduleBlocks(pat);
     const card = document.createElement("div");
@@ -442,16 +444,23 @@ function renderCities() {
   if (!g) return;
   g.innerHTML = Object.entries(CITIES)
     .map(([k, c]) => {
-      const pat = getGroupPattern(k, 1);
+      // Use AI-fetched pattern for the user's own city
+      const pat =
+        k === S.user.city && S.aiPattern ? S.aiPattern : getGroupPattern(k, 1);
       const st = getPowerStats(pat);
+      const isUserCity = k === S.user.city;
+      const aiLabel =
+        isUserCity && S.aiPattern
+          ? ' <span style="font-size:9px;background:#1d9e75;color:#fff;padding:1px 5px;border-radius:4px;margin-left:4px">AI</span>'
+          : "";
       const slots = pat
         .map(
           (v) =>
             `<div class="mini-s ${v ? "power" : "off"}" style="flex:1;height:16px"></div>`,
         )
         .join("");
-      return `<div class="city-card" onclick="cityInfo('${k}')">
-      <div class="city-card-hd"><span class="city-nm-lbl">${c.name}</span><span class="city-util-badge">${c.utility}</span></div>
+      return `<div class="city-card${isUserCity ? " today" : ""}" onclick="cityInfo('${k}')">
+      <div class="city-card-hd"><span class="city-nm-lbl">${c.name}${aiLabel}</span><span class="city-util-badge">${c.utility}</span></div>
       <div class="city-mini-tl">${slots}</div>
       <div class="city-info-row">
         <div class="ci-itm"><div class="ci-dot g"></div>${st.power}h power</div>
@@ -474,9 +483,13 @@ function filterCities(q) {
 }
 function cityInfo(k) {
   const c = CITIES[k];
-  const st = getPowerStats(getGroupPattern(k, 1));
+  const pat =
+    k === S.user.city && S.aiPattern ? S.aiPattern : getGroupPattern(k, 1);
+  const st = getPowerStats(pat);
+  const src =
+    k === S.user.city && S.aiPattern ? "AI-fetched data" : "historical pattern";
   alert(
-    `${c.name} (${c.utility})\nProvince: ${c.province}\nAvg power: ${st.power}h/day  |  Outage: ${st.outage}h/day\nPeak times: ${c.peak}\n\nTo use this city, go to Settings (gear icon).`,
+    `${c.name} (${c.utility})\nProvince: ${c.province}\nAvg power: ${st.power}h/day  |  Outage: ${st.outage}h/day\nPeak times: ${c.peak}\nData source: ${src}\n\nTo use this city, go to Settings (gear icon).`,
   );
 }
 
