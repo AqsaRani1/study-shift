@@ -764,39 +764,92 @@ Use typical rotation patterns for ${c.utility} group ${S.user.group}. Respond wi
 
   try {
     const raw = await callGemini(prompt, systemCtx);
-    // Bulletproof JSON extraction — handles markdown fences, extra text, etc.
+    // LOG raw AI response so we can debug
+    console.log("=== RAW AI RESPONSE ===");
+    console.log(raw);
+    console.log("=== END RAW RESPONSE ===");
+
+    // Bulletproof JSON extraction
     let parsed = null;
+
     // Try 1: direct parse
     try {
       parsed = JSON.parse(raw.trim());
-    } catch (e) {}
-    // Try 2: extract first {...} block
+      console.log("Parse: Try1 success");
+    } catch (e) {
+      console.log("Parse Try1 failed:", e.message);
+    }
+
+    // Try 2: strip markdown fences then parse
+    if (!parsed) {
+      const stripped = raw.replace(/```json|```/gi, "").trim();
+      try {
+        parsed = JSON.parse(stripped);
+        console.log("Parse: Try2 success");
+      } catch (e) {
+        console.log("Parse Try2 failed:", e.message);
+      }
+    }
+
+    // Try 3: extract first {...} block
     if (!parsed) {
       const match = raw.match(/\{[\s\S]*?\}/);
       if (match)
         try {
           parsed = JSON.parse(match[0]);
-        } catch (e) {}
+          console.log("Parse: Try3 success");
+        } catch (e) {
+          console.log("Parse Try3 failed:", e.message);
+        }
     }
-    // Try 3: extract largest {...} block
+
+    // Try 4: extract largest {...} block
     if (!parsed) {
       const match = raw.match(/\{[\s\S]*\}/);
       if (match)
         try {
           parsed = JSON.parse(match[0]);
-        } catch (e) {}
+          console.log("Parse: Try4 success");
+        } catch (e) {
+          console.log("Parse Try4 failed:", e.message);
+        }
     }
-    // Try 4: extract hours array directly and build object
+
+    // Try 5: extract hours array directly
     if (!parsed) {
-      const arrMatch = raw.match(/\[([0-9,\s]+)\]/);
+      const arrMatch = raw.match(/\[([\d,\s]+)\]/);
       if (arrMatch) {
-        const hrs = JSON.parse(arrMatch[0]);
-        if (hrs.length === 24) parsed = { hours: hrs };
+        try {
+          const hrs = JSON.parse(arrMatch[0]);
+          if (hrs.length === 24) {
+            parsed = { hours: hrs };
+            console.log("Parse: Try5 success");
+          }
+        } catch (e) {
+          console.log("Parse Try5 failed:", e.message);
+        }
       }
     }
-    if (!parsed)
-      throw new Error("Could not parse schedule JSON from AI response");
-    // Normalize: coerce "0"/"1" strings to numbers, clamp any other value to 0/1
+
+    // FALLBACK: if all parsing fails, use a typical LESCO-style pattern
+    // so the app never breaks — just show a default pattern
+    if (!parsed) {
+      console.warn(
+        "All parse attempts failed — using default fallback pattern",
+      );
+      console.log("Raw response was:", JSON.stringify(raw));
+      // Typical pattern: outages at 2-5am, 10am-1pm, 6-9pm
+      parsed = {
+        hours: [
+          0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1,
+          1,
+        ],
+        note: "Default pattern (AI response unreadable) · Live API integration available for production",
+      };
+      setAIBarSub("⚠ Using default pattern — AI response was unreadable");
+    }
+
+    // Normalize: coerce values to 0/1
     if (Array.isArray(parsed.hours)) {
       parsed.hours = parsed.hours.map((v) => (Number(v) >= 1 ? 1 : 0));
     }
