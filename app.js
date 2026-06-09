@@ -748,6 +748,7 @@ Use typical rotation patterns for ${c.utility} group ${S.user.group}. Respond wi
 
     S.aiPattern = parsed.hours;
     S.aiSource = `Historical pattern · ${c.utility} Group ${S.user.group} · Live API integration available for production`;
+    console.log(parsed);
     save();
     autoSchedule();
     renderDash();
