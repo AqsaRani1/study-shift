@@ -1,5 +1,8 @@
 // ============================================================
 // netlify/functions/gemini-proxy.js
+// Now powered by Groq (free tier) — drop-in Gemini replacement
+// Set GROQ_API_KEY in Netlify environment variables
+// Get free key at: https://console.groq.com/keys
 // ============================================================
 exports.handler = async function (event) {
   const CORS = {
@@ -11,26 +14,22 @@ exports.handler = async function (event) {
   if (event.httpMethod === "OPTIONS")
     return { statusCode: 200, headers: CORS, body: "" };
 
-  // GET = health check — open in browser to debug
+  // GET = health check
   if (event.httpMethod === "GET") {
-    const key = process.env.GEMINI_API_KEY || "";
+    const key = process.env.GROQ_API_KEY || "";
     const keySet = key.length > 0;
-    const keyOk = key.startsWith("AIza"); // all Gemini keys start with AIza
     return {
       statusCode: 200,
       headers: { ...CORS, "Content-Type": "application/json" },
       body: JSON.stringify({
         status: keySet ? "ok" : "error",
         key_set: keySet,
-        key_valid: keyOk,
         key_hint: keySet
           ? `${key.slice(0, 6)}...${key.slice(-4)} (${key.length} chars)`
           : "NOT SET",
         message: !keySet
-          ? "❌ GEMINI_API_KEY not set. Netlify → Site configuration → Environment variables → Add GEMINI_API_KEY"
-          : !keyOk
-            ? "⚠️ Key is set but does NOT start with AIza — it may be wrong. Gemini keys always start with AIza"
-            : "✅ Key looks correct. Function is ready.",
+          ? "❌ GROQ_API_KEY not set. Netlify → Site configuration → Environment variables → Add GROQ_API_KEY"
+          : "✅ Key is set. Function is ready.",
       }),
     };
   }
@@ -38,7 +37,7 @@ exports.handler = async function (event) {
   if (event.httpMethod !== "POST")
     return { statusCode: 405, headers: CORS, body: "Method Not Allowed" };
 
-  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+  const apiKey = (process.env.GROQ_API_KEY || "").trim();
 
   if (!apiKey) {
     return {
@@ -47,24 +46,13 @@ exports.handler = async function (event) {
       body: JSON.stringify({
         error: {
           message:
-            "GEMINI_API_KEY not set. Go to Netlify → Site configuration → Environment variables → Add GEMINI_API_KEY",
+            "GROQ_API_KEY not set. Go to Netlify → Site configuration → Environment variables → Add GROQ_API_KEY",
         },
       }),
     };
   }
 
-  // if (!apiKey.startsWith("AIza")) {
-  //   return {
-  //     statusCode: 500,
-  //     headers: { ...CORS, "Content-Type": "application/json" },
-  //     body: JSON.stringify({
-  //       error: {
-  //         message: `API key looks wrong — Gemini keys always start with "AIza". Your key starts with "${apiKey.slice(0, 6)}". Get a fresh key from aistudio.google.com/apikey`,
-  //       },
-  //     }),
-  //   };
-  // }
-
+  // Parse incoming Gemini-format request from app.js
   let parsedBody;
   try {
     parsedBody = JSON.parse(event.body || "{}");
@@ -78,36 +66,58 @@ exports.handler = async function (event) {
     };
   }
 
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(parsedBody),
-    });
-    const text = await res.text();
+  // Convert Gemini format → Groq/OpenAI format
+  const geminiText = parsedBody?.contents?.[0]?.parts?.[0]?.text || "";
+  const maxTokens = parsedBody?.generationConfig?.maxOutputTokens || 1024;
+  const temperature = parsedBody?.generationConfig?.temperature ?? 0.7;
 
-    // If Gemini returned an error, log it clearly
+  const groqBody = {
+    model: "llama3-8b-8192",
+    messages: [{ role: "user", content: geminiText }],
+    max_tokens: maxTokens,
+    temperature: temperature,
+  };
+
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(groqBody),
+    });
+
+    const data = await res.json();
+
     if (!res.ok) {
-      let errMsg = text;
-      try {
-        const parsed = JSON.parse(text);
-        errMsg = parsed?.error?.message || text;
-      } catch (e) {}
-      console.error(`Gemini API error ${res.status}:`, errMsg);
+      console.error(`Groq API error ${res.status}:`, data);
+      return {
+        statusCode: res.status,
+        headers: { ...CORS, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          error: { message: data?.error?.message || "Groq API error" },
+        }),
+      };
     }
 
+    // Convert Groq response → Gemini response format so app.js works unchanged
+    const text = data?.choices?.[0]?.message?.content || "";
+    const geminiResponse = {
+      candidates: [{ content: { parts: [{ text }] } }],
+    };
+
     return {
-      statusCode: res.status,
+      statusCode: 200,
       headers: { ...CORS, "Content-Type": "application/json" },
-      body: text,
+      body: JSON.stringify(geminiResponse),
     };
   } catch (err) {
     return {
       statusCode: 500,
       headers: { ...CORS, "Content-Type": "application/json" },
       body: JSON.stringify({
-        error: { message: `Network error reaching Gemini: ${err.message}` },
+        error: { message: `Network error reaching Groq: ${err.message}` },
       }),
     };
   }
